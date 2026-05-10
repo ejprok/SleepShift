@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import AlarmKit
 
 @MainActor @Observable
 final class SleepShiftManager {
@@ -11,6 +12,8 @@ final class SleepShiftManager {
 
     private var modelContext: ModelContext?
     private let shiftPerDay: Double = 6.5
+    private let alarmManager = AlarmManager.shared
+    private let alarmIDKey = "sleepshift.alarmID"
 
     private init() {}
 
@@ -84,10 +87,74 @@ final class SleepShiftManager {
         return streak
     }
 
-    // MARK: - AlarmKit (Phase 3)
+    // MARK: - AlarmKit
 
-    func requestAuthorization() async {}
-    func scheduleNextAlarm(forDay day: Int) async {}
-    func handleForeground() async {}
-    func observeAlarms() async {}
+    func requestAuthorization() async {
+        let status = await alarmManager.requestAuthorization()
+        isAuthorized = (status == .authorized)
+    }
+
+    func scheduleNextAlarm(forDay day: Int) async {
+        guard let program = activeProgram else { return }
+
+        // Always cancel existing before scheduling — only 1 active alarm at a time
+        if let id = activeAlarmID {
+            try? await alarmManager.remove(alarmWithID: id)
+            activeAlarmID = nil
+            UserDefaults.standard.removeObject(forKey: alarmIDKey)
+        }
+
+        let wakeDate = wakeTime(forDay: day, program: program)
+        let metadata = WakeShiftMetadata(day: day, scheduledWakeTime: wakeDate)
+
+        let attributes = AlarmAttributes(
+            title: "Day \(day)/\(program.totalDays) — \(timeString(wakeDate))",
+            subtitle: "Tap 'I'm up' within 15 min to advance",
+            tintColor: .indigo,
+            stopButton: AlarmAttributes.Button(
+                title: "I'm up ✓",
+                intent: SuccessfulWakeIntent(scheduledDay: day, scheduledWakeTime: wakeDate)
+            ),
+            secondaryButton: AlarmAttributes.Button(
+                title: "Not today",
+                intent: SkipTodayIntent(scheduledDay: day)
+            )
+        )
+
+        do {
+            let alarm = try await alarmManager.schedule(
+                .alarm(date: wakeDate, attributes: attributes),
+                metadata: metadata
+            )
+            activeAlarmID = alarm.id
+            UserDefaults.standard.set(alarm.id, forKey: alarmIDKey)
+        } catch {
+            // Alarm scheduling failed — foreground fallback button will surface this
+        }
+    }
+
+    func handleForeground() async {
+        guard let program = activeProgram, program.isActive else { return }
+        let alarms = await alarmManager.alarms
+        if !alarms.contains(where: { $0.id == activeAlarmID }) {
+            activeAlarmID = nil
+            await scheduleNextAlarm(forDay: program.currentDay)
+        }
+    }
+
+    func observeAlarms() async {
+        for await alarms in alarmManager.alarmUpdates {
+            let stillActive = alarms.contains { $0.id == activeAlarmID }
+            if !stillActive {
+                activeAlarmID = nil
+                UserDefaults.standard.removeObject(forKey: alarmIDKey)
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func timeString(_ date: Date) -> String {
+        date.formatted(.dateTime.hour().minute())
+    }
 }
