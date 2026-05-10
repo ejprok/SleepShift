@@ -63,10 +63,13 @@ class MainCoordinator: Coordinator {
         navigationController.setViewControllers([UIHostingController(rootView: view)], animated: true)
     }
 
-    // MARK: - History (Phase 7)
+    // MARK: - History
 
     func showHistory() {
-        // HistoryView wired in Phase 7
+        let view = HistoryView()
+            .modelContainer(modelContainer)
+
+        navigationController.pushViewController(UIHostingController(rootView: view), animated: true)
     }
 }
 
