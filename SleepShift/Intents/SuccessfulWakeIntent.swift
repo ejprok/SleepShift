@@ -18,7 +18,7 @@ struct SuccessfulWakeIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         let container = try ModelContainer(for: ShiftProgram.self, WakeAttempt.self)
         let manager = SleepShiftManager.shared
-        manager.setup(context: container.mainContext)
+        await manager.setup(context: container.mainContext)
 
         let minutesLate = Date.now.timeIntervalSince(scheduledWakeTime) / 60
         let successful = minutesLate < 15
@@ -29,7 +29,7 @@ struct SuccessfulWakeIntent: AppIntent {
             await manager.repeatDay()
         }
 
-        manager.logAttempt(
+        await manager.logAttempt(
             day: scheduledDay,
             scheduledTime: scheduledWakeTime,
             dismissedTime: .now,

@@ -15,18 +15,18 @@ struct SkipTodayIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         let container = try ModelContainer(for: ShiftProgram.self, WakeAttempt.self)
         let manager = SleepShiftManager.shared
-        manager.setup(context: container.mainContext)
+        await manager.setup(context: container.mainContext)
 
-        let scheduledTime: Date
-        if let program = manager.activeProgram {
-            scheduledTime = manager.wakeTime(forDay: scheduledDay, program: program)
-        } else {
-            scheduledTime = UserDefaults.standard.object(forKey: "sleepshift.alarmTime") as? Date ?? .now
+        let scheduledTime: Date = await MainActor.run {
+            if let program = manager.activeProgram {
+                return manager.wakeTime(forDay: scheduledDay, program: program)
+            }
+            return UserDefaults.standard.object(forKey: "sleepshift.alarmTime") as? Date ?? .now
         }
 
         await manager.repeatDay()
 
-        manager.logAttempt(
+        await manager.logAttempt(
             day: scheduledDay,
             scheduledTime: scheduledTime,
             dismissedTime: nil,
