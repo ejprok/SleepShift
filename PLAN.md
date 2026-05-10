@@ -7,46 +7,50 @@ Xcode project: `SleepShift.xcodeproj`
 
 ## Phase 0 — Project Setup
 
-**Goal:** Compiles cleanly as an empty SwiftUI iOS 26 app with no UIKit cruft.
+**Goal:** Compiles cleanly on iOS 26 with the UIKit coordinator skeleton intact.
 
-### 0.1 Delete UIKit template files
-Remove these files from the Xcode project and disk:
-- `SleepShift/AppDelegate.swift`
-- `SleepShift/SceneDelegate.swift`
-- `SleepShift/MainCoordinator.swift`
-- `SleepShift/RootViewController.swift`
-- `SleepShift/ViewController.swift`
-- `SleepShift/Base.lproj/LaunchScreen.storyboard`
+### 0.1 Keep the UIKit coordinator structure
+The template's `AppDelegate` / `SceneDelegate` / `MainCoordinator` / `RootViewController` stay. SwiftUI views will be hosted inside `UIHostingController` instances; navigation is driven entirely by the coordinator, not SwiftUI `NavigationStack` or `TabView`.
 
-Remove `EJComponent` from linked frameworks (if present in project.pbxproj).
+Delete only the unused stub:
+- `SleepShift/ViewController.swift` (empty placeholder — replaced by real view controllers in later phases)
 
-### 0.2 Create SwiftUI entry point
-New file: `SleepShift/SleepShiftApp.swift`
+### 0.2 Update AppDelegate — set up SwiftData ModelContainer
+`AppDelegate` owns the `ModelContainer` and exposes it as a property. Every coordinator that needs data access gets it injected.
 
 ```swift
-import SwiftUI
+// AppDelegate.swift
+import UIKit
 import SwiftData
 
 @main
-struct SleepShiftApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .modelContainer(for: [ShiftProgram.self, WakeAttempt.self])
-        }
+class AppDelegate: UIResponder, UIApplicationDelegate {
+
+    var modelContainer: ModelContainer = {
+        try! ModelContainer(for: ShiftProgram.self, WakeAttempt.self)
+    }()
+
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Register BGAppRefreshTask identifier here (Phase 9)
+        return true
     }
+    // ... scene lifecycle unchanged
 }
 ```
 
-New file: `SleepShift/ContentView.swift` — placeholder `Text("SleepShift")` until routing is wired.
+### 0.3 Update SceneDelegate — call manager setup
+```swift
+// SceneDelegate.swift — in scene(_:willConnectTo:)
+let container = (UIApplication.shared.delegate as! AppDelegate).modelContainer
+SleepShiftManager.shared.setup(context: container.mainContext)
+```
 
-### 0.3 Update project settings
+### 0.4 Update project settings
 In `SleepShift.xcodeproj`:
 - Deployment target → **iOS 26.0**
-- Remove `UIMainStoryboardFile` from Info.plist if present
-- Remove `UILaunchStoryboardName` or replace with launch screen config
 
-### 0.4 Update Info.plist
+### 0.5 Update Info.plist
 Add:
 ```xml
 <key>NSAlarmKitUsageDescription</key>
@@ -58,11 +62,11 @@ Add:
 </array>
 ```
 
-### 0.5 Enable capabilities in Xcode
+### 0.6 Enable capabilities in Xcode
 - Signing & Capabilities → **+** → **Alarms** (AlarmKit entitlement)
 - Signing & Capabilities → **+** → **Background Modes** → check **Background fetch**
 
-**Checkpoint:** App builds and runs to a blank SwiftUI view.
+**Checkpoint:** App builds and runs to the existing template root screen.
 
 ---
 
@@ -122,7 +126,7 @@ class WakeAttempt {
 }
 ```
 
-**Checkpoint:** Both models compile, ModelContainer in App compiles without error.
+**Checkpoint:** Both models compile, `ModelContainer` in `AppDelegate` initializes without error.
 
 ---
 
@@ -206,7 +210,7 @@ final class SleepShiftManager {
 }
 ```
 
-**Checkpoint:** Manager compiles. Wire `setup(context:)` call into `SleepShiftApp` using `.onAppear` or a custom ViewModifier that reads `@Environment(\.modelContext)`.
+**Checkpoint:** Manager compiles. `setup(context:)` is called from `SceneDelegate` after the container is ready.
 
 ---
 
@@ -388,19 +392,32 @@ struct SkipTodayIntent: AppIntent {
 
 **Goal:** User can configure and start a shift program.
 
-New file: `SleepShift/Views/OnboardingView.swift`
+New file: `SleepShift/Views/OnboardingView.swift` — pure SwiftUI view, no navigation logic.
 
 Key elements:
 - `DatePicker` (`.hourAndMinute`) for current wake time
 - `DatePicker` (`.hourAndMinute`) for target wake time
 - Computed summary label: `"\(totalDays) days · ~6.5 min/day"`
-- "Start Program" button:
-  1. Calls `manager.requestAuthorization()`
-  2. If authorized, creates `ShiftProgram`, inserts into context, sets `isActive = true`
-  3. Calls `manager.scheduleNextAlarm(forDay: 1)`
-  4. Dismisses onboarding / navigates to Home
+- "Start Program" button calls a closure/callback — the coordinator handles what happens next
 
-**Checkpoint:** Onboarding creates a program and schedules day 1 alarm.
+```swift
+struct OnboardingView: View {
+    var onStart: (Date, Date) -> Void  // injected by coordinator
+
+    var body: some View { ... }
+}
+```
+
+The coordinator presents this via:
+```swift
+let view = OnboardingView { startTime, targetTime in
+    // coordinator handles program creation + transition to Home
+}
+let vc = UIHostingController(rootView: view)
+navigationController.setViewControllers([vc], animated: false)
+```
+
+**Checkpoint:** Onboarding creates a program and schedules day 1 alarm; coordinator pushes Home.
 
 ---
 
@@ -408,17 +425,27 @@ Key elements:
 
 **Goal:** Main screen shows program state and today's alarm.
 
-New file: `SleepShift/Views/HomeView.swift`
+New file: `SleepShift/Views/HomeView.swift` — pure SwiftUI view, callbacks for actions.
 
 Key elements:
 - Large display: `"Day \(program.currentDay) of \(program.totalDays)"`
 - Today's alarm time (prominent, large font)
 - Tomorrow's projected time (secondary)
-- Current streak — computed from recent `WakeAttempt` records (consecutive `successful == true` from most recent backward)
+- Current streak — computed from recent `WakeAttempt` records
 - Last 7 days list (`WakeAttemptRowView`)
-- Fallback button "Schedule Today's Alarm" — visible when `manager.activeAlarmID` is nil or not in `alarmManager.alarms`
+- Fallback button "Schedule Today's Alarm" — visible when no active alarm detected
+- `onShowHistory: () -> Void` callback — coordinator pushes `HistoryViewController`
 - `.task { await manager.observeAlarms() }` — keeps alarm state live
-- `.onChange(of: scenePhase) { if phase == .active { await manager.handleForeground() } }`
+- Foreground check: called by coordinator from `sceneDidBecomeActive` via `SceneDelegate`
+
+```swift
+struct HomeView: View {
+    @ObservedObject var manager: SleepShiftManager  // or @Observable / Bindable
+    var onShowHistory: () -> Void
+
+    var body: some View { ... }
+}
+```
 
 **Checkpoint:** Home shows correct day, time, and streak. Fallback button schedules alarm.
 
@@ -428,39 +455,87 @@ Key elements:
 
 **Goal:** Full log of wake attempts.
 
-New file: `SleepShift/Views/HistoryView.swift`
+New file: `SleepShift/Views/HistoryView.swift` — pure SwiftUI view.
 
 Key elements:
-- `@Query(sort: \WakeAttempt.scheduledTime, order: .reverse)` var attempts
+- Receives `[WakeAttempt]` fetched by the coordinator (or fetches via injected `ModelContext`)
 - List rows showing: day number, scheduled time, actual dismiss time (or "—"), success/fail badge
-- Navigation accessible from Home (e.g., toolbar button)
+
+Coordinator pushes it:
+```swift
+let view = HistoryView(modelContext: container.mainContext)
+let vc = UIHostingController(rootView: view)
+navigationController.pushViewController(vc, animated: true)
+```
 
 **Checkpoint:** History shows all logged attempts in reverse chronological order.
 
 ---
 
-## Phase 8 — App Navigation / Routing
+## Phase 8 — Coordinator Routing
 
-**Goal:** Smooth flow between Onboarding → Home ↔ History.
+**Goal:** Clean coordinator-driven flow: Onboarding → Home ↔ History.
 
-Update `ContentView.swift`:
+Update `MainCoordinator.swift`:
+
 ```swift
-struct ContentView: View {
-    @Query var programs: [ShiftProgram]
-    @Environment(\.modelContext) var context
+class MainCoordinator: Coordinator {
+    var childCoordinators: [Coordinator] = []
+    let navigationController: UINavigationController
+    let modelContainer: ModelContainer
 
-    var activeProgram: ShiftProgram? { programs.first(where: { $0.isActive }) }
+    init(navigationController: UINavigationController, modelContainer: ModelContainer) {
+        self.navigationController = navigationController
+        self.modelContainer = modelContainer
+    }
 
-    var body: some View {
-        if activeProgram != nil {
-            TabView {  // or NavigationStack with sidebar
-                HomeView()
-                HistoryView()
-            }
+    func start() {
+        let manager = SleepShiftManager.shared
+        if manager.activeProgram != nil {
+            showHome()
         } else {
-            OnboardingView()
+            showOnboarding()
         }
     }
+
+    private func showOnboarding() {
+        let view = OnboardingView { [weak self] startTime, targetTime in
+            Task { @MainActor in
+                await self?.handleProgramStart(startTime: startTime, targetTime: targetTime)
+            }
+        }
+        navigationController.setViewControllers([UIHostingController(rootView: view)], animated: false)
+    }
+
+    private func handleProgramStart(startTime: Date, targetTime: Date) async {
+        let context = modelContainer.mainContext
+        let program = ShiftProgram(startWakeTime: startTime, targetWakeTime: targetTime)
+        program.isActive = true
+        context.insert(program)
+        try? context.save()
+        SleepShiftManager.shared.setup(context: context)
+        await SleepShiftManager.shared.scheduleNextAlarm(forDay: 1)
+        showHome()
+    }
+
+    func showHome() {
+        let view = HomeView(manager: SleepShiftManager.shared, onShowHistory: { [weak self] in
+            self?.showHistory()
+        })
+        navigationController.setViewControllers([UIHostingController(rootView: view)], animated: true)
+    }
+
+    func showHistory() {
+        let view = HistoryView(modelContext: modelContainer.mainContext)
+        navigationController.pushViewController(UIHostingController(rootView: view), animated: true)
+    }
+}
+```
+
+`SceneDelegate` calls `handleForeground()` in `sceneDidBecomeActive`:
+```swift
+func sceneDidBecomeActive(_ scene: UIScene) {
+    Task { await SleepShiftManager.shared.handleForeground() }
 }
 ```
 
@@ -470,7 +545,7 @@ struct ContentView: View {
 
 **Goal:** Alarm is always scheduled, even if app hasn't been opened.
 
-Update `SleepShiftApp.swift` — register BGAppRefreshTask:
+Update `AppDelegate.swift` — register BGAppRefreshTask in `application(_:didFinishLaunchingWithOptions:)`:
 
 ```swift
 import BackgroundTasks
@@ -519,8 +594,10 @@ Add `BGTaskSchedulerPermittedIdentifiers` to Info.plist:
 
 ```
 SleepShift/
-├── SleepShiftApp.swift
-├── ContentView.swift
+├── AppDelegate.swift          ← owns ModelContainer, registers BGTask
+├── SceneDelegate.swift        ← calls manager.setup(), handleForeground()
+├── MainCoordinator.swift      ← all navigation logic
+├── RootViewController.swift   ← kept from template (coordinator entry point)
 ├── Models/
 │   ├── ShiftProgram.swift
 │   └── WakeAttempt.swift
@@ -538,7 +615,7 @@ SleepShift/
 │   └── WakeAttemptRowView.swift
 ├── Assets.xcassets/
 ├── Info.plist
-└── SleepShift.entitlements  ← add Alarms entitlement here
+└── SleepShift.entitlements   ← add Alarms entitlement here
 ```
 
 ---
@@ -547,7 +624,7 @@ SleepShift/
 
 | Phase | What | Unblocks |
 |-------|------|----------|
-| 0 | Project setup (SwiftUI, iOS 26, Info.plist, capabilities) | Everything |
+| 0 | Project setup (iOS 26, AppDelegate ModelContainer, Info.plist, capabilities) | Everything |
 | 1 | SwiftData models | Manager, Views |
 | 2 | SleepShiftManager (no AlarmKit) | Views, logic |
 | 3 | AlarmKit integration | Real alarms, Intents |
@@ -555,7 +632,7 @@ SleepShift/
 | 5 | Onboarding | Start program flow |
 | 6 | Home | Daily use |
 | 7 | History | Logging visibility |
-| 8 | Navigation routing | Full app flow |
+| 8 | Coordinator routing (Onboarding → Home ↔ History) | Full app flow |
 | 9 | Background refresh | Reliability |
 | 10 | Polish | Ship |
 
@@ -567,5 +644,6 @@ SleepShift/
 - **`nonisolated` on `WakeShiftMetadata`** — mandatory in Xcode 26 due to default MainActor isolation
 - **One alarm at a time** — always cancel existing before scheduling new
 - **AppIntents lock screen** — test from locked device early; intent execution context is different from foreground
-- **SwiftData ModelContainer for future widget** — keep container setup in one place; don't create multiple containers
-- **`alarmManager.alarmUpdates` is `AsyncSequence`** — iterate with `.task {}` in SwiftUI, not `onAppear`
+- **SwiftData ModelContainer** — owned by `AppDelegate`, injected into coordinator; don't create multiple containers
+- **`alarmManager.alarmUpdates` is `AsyncSequence`** — iterate with `.task {}` in the SwiftUI view, not `onAppear`
+- **Coordinator owns navigation, views own none** — SwiftUI views communicate out via callbacks/closures only; no `NavigationLink`, no `NavigationStack`
