@@ -1,5 +1,6 @@
 import AppIntents
 import Foundation
+import SwiftData
 
 struct SuccessfulWakeIntent: AppIntent {
     static let title: LocalizedStringResource = "Mark Wake Successful"
@@ -15,7 +16,26 @@ struct SuccessfulWakeIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
-        // Logic implemented in Phase 4
+        let container = try ModelContainer(for: ShiftProgram.self, WakeAttempt.self)
+        let manager = SleepShiftManager.shared
+        manager.setup(context: container.mainContext)
+
+        let minutesLate = Date.now.timeIntervalSince(scheduledWakeTime) / 60
+        let successful = minutesLate < 15
+
+        if successful {
+            await manager.advanceDay()
+        } else {
+            await manager.repeatDay()
+        }
+
+        manager.logAttempt(
+            day: scheduledDay,
+            scheduledTime: scheduledWakeTime,
+            dismissedTime: .now,
+            successful: successful
+        )
+
         return .result()
     }
 }
