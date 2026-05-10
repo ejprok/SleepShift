@@ -19,6 +19,16 @@ final class SleepShiftManager {
     private let alarmManager = AlarmManager.shared
     private let alarmIDKey = "sleepshift.alarmID"
 
+    // MARK: - Dev Mode
+    var isDevMode: Bool = UserDefaults.standard.bool(forKey: "sleepshift.devMode") {
+        didSet { UserDefaults.standard.set(isDevMode, forKey: "sleepshift.devMode") }
+    }
+    // Interval between alarms in dev mode (minutes)
+    var devModeIntervalMinutes: Int = max(1, UserDefaults.standard.integer(forKey: "sleepshift.devInterval") == 0
+        ? 5 : UserDefaults.standard.integer(forKey: "sleepshift.devInterval")) {
+        didSet { UserDefaults.standard.set(devModeIntervalMinutes, forKey: "sleepshift.devInterval") }
+    }
+
     private init() {}
 
     func setup(context: ModelContext) {
@@ -42,6 +52,11 @@ final class SleepShiftManager {
     // MARK: - Wake Time Computation
 
     func wakeTime(forDay day: Int, program: ShiftProgram) -> Date {
+        if isDevMode {
+            // Compress entire schedule into minutes: each day fires devModeIntervalMinutes apart
+            return program.startDate.addingTimeInterval(Double(day - 1) * Double(devModeIntervalMinutes) * 60)
+        }
+
         let shiftMinutes = shiftPerDay * Double(day - 1)
         let startComponents = Calendar.current.dateComponents([.hour, .minute], from: program.startWakeTime)
         let startMinutes = (startComponents.hour ?? 6) * 60 + (startComponents.minute ?? 0)

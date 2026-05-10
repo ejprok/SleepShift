@@ -6,6 +6,9 @@ struct HomeView: View {
     var onShowHistory: () -> Void
 
     @Query(sort: \WakeAttempt.scheduledTime, order: .reverse) private var attempts: [WakeAttempt]
+    #if DEBUG
+    @State private var showDevSettings = false
+    #endif
 
     private var program: ShiftProgram? { manager.activeProgram }
     private var recentAttempts: [WakeAttempt] { Array(attempts.prefix(7)) }
@@ -32,8 +35,20 @@ struct HomeView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("History") { onShowHistory() }
             }
+            #if DEBUG
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { showDevSettings = true } label: {
+                    Image(systemName: "hammer")
+                }
+            }
+            #endif
         }
         .task { await manager.observeAlarms() }
+        #if DEBUG
+        .sheet(isPresented: $showDevSettings) {
+            DevSettingsView(manager: manager)
+        }
+        #endif
     }
 
     // MARK: - Day Card
