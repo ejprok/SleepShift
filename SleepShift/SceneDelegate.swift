@@ -26,6 +26,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             modelContainer: container
         )
 
+        SleepShiftManager.shared.setup(context: container.mainContext)
+
         appCoordinator.addChild(mainCoordinator)
         appCoordinator.start()
         mainCoordinator.start()
@@ -35,7 +37,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
-        // SleepShiftManager.shared.handleForeground() wired in Phase 2
+        Task { await SleepShiftManager.shared.handleForeground() }
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {}
