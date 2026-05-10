@@ -604,7 +604,7 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		04D327F32EBB22710028D0C3 /* XCRemoteSwiftPackageReference "ej-component-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ejprok/ej-component-ios";
+			repositoryURL = "git@github.com:ejprok/ej-component-ios.git";
 			requirement = {
 				branch = main;
 				kind = branch;
