@@ -1,6 +1,6 @@
 //
 //  RootViewController.swift
-//  TemplateApp
+//  SleepShift
 //
 //  Created by Edward Prokopik on 10/28/25.
 //

@@ -5,8 +5,8 @@ DerivedData/
 # Xcode specific
 *.xcworkspace
 !default.xcworkspace
-!TemplateApp.xcodeproj/project.xcworkspace/xcshareddata/
-!TemplateApp.xcodeproj/project.xcworkspace/xcshareddata/**
+!SleepShift.xcodeproj/project.xcworkspace/xcshareddata/
+!SleepShift.xcodeproj/project.xcworkspace/xcshareddata/**
 !*.xcworkspace/xcshareddata/
 !*.xcworkspace/xcshareddata/**
 xcuserdata/

@@ -1,13 +1,13 @@
 //
-//  TemplateAppUITestsLaunchTests.swift
-//  TemplateAppUITests
+//  SleepShiftUITestsLaunchTests.swift
+//  SleepShiftUITests
 //
 //  Created by Edward Prokopik on 10/28/25.
 //
 
 import XCTest
 
-final class TemplateAppUITestsLaunchTests: XCTestCase {
+final class SleepShiftUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true
