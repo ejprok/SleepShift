@@ -52,21 +52,15 @@ class MainCoordinator: Coordinator {
         showHome()
     }
 
-    // MARK: - Home (Phase 6)
+    // MARK: - Home
 
     func showHome() {
-        // HomeView wired in Phase 6 — placeholder
-        let vc = UIViewController()
-        vc.view.backgroundColor = .systemBackground
-        let label = UILabel()
-        label.text = "Home — Phase 6"
-        label.translatesAutoresizingMaskIntoConstraints = false
-        vc.view.addSubview(label)
-        NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: vc.view.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: vc.view.centerYAnchor),
-        ])
-        navigationController.setViewControllers([vc], animated: true)
+        let view = HomeView(manager: SleepShiftManager.shared, onShowHistory: { [weak self] in
+            self?.showHistory()
+        })
+        .modelContainer(modelContainer)
+
+        navigationController.setViewControllers([UIHostingController(rootView: view)], animated: true)
     }
 
     // MARK: - History (Phase 7)
