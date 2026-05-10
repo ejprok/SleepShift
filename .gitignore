@@ -1,0 +1,164 @@
+# Build artifacts
+build/
+DerivedData/
+
+# Xcode specific
+*.xcworkspace
+!default.xcworkspace
+!TemplateApp.xcodeproj/project.xcworkspace/xcshareddata/
+!TemplateApp.xcodeproj/project.xcworkspace/xcshareddata/**
+!*.xcworkspace/xcshareddata/
+!*.xcworkspace/xcshareddata/**
+xcuserdata/
+*.xcuserstate
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Carthage
+Carthage/Build/
+Carthage/Checkouts/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Temporary files
+*.tmp
+*.swp
+*.lock
+.DS_Store
+.idea/
+*.moved-aside
+*.xcuserdatad
+*.xcscmblueprint
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Provisioning profiles
+*.mobileprovision
+*.provisionprofile
+
+# Certificates
+*.cer
+*.crt
+*.p12
+
+# Logs
+*.log
+
+# AppCenter / Crashlytics / Firebase
+appcenter-config.json
+firebase-debug.log
+
+# Images and Thumbnails
+*.imageset/Icon-*.png
+*.imageset/Contents.json
+*.xcassets/Contents.json
+
+# App Specific
+# Uncomment below if your app generates persistent files or caches during builds
+# *.sqlite
+# *.sqlite-shm
+# *.sqlite-wal
+
+# SwiftLint / Code Linting
+.swiftlint.yml
+
+# Secrets
+.env
+*.key
+*.crt
+
+# Add custom ignores specific to your project below
+
+# Node.js / API
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
