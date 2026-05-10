@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SwiftUI
 import AlarmKit
 
 @MainActor @Observable
@@ -137,7 +138,7 @@ final class SleepShiftManager {
             tintColor: .indigo
         )
 
-        let configuration = AlarmManager.AlarmConfiguration(
+        let configuration = AlarmManager.AlarmConfiguration<WakeShiftMetadata>(
             schedule: Alarm.Schedule.fixed(wakeDate),
             attributes: attributes,
             secondaryIntent: SkipTodayIntent(scheduledDay: day)

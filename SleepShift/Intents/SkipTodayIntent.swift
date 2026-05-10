@@ -1,6 +1,6 @@
 import AppIntents
 
-struct SkipTodayIntent: AppIntent {
+struct SkipTodayIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Skip Today"
     static let isDiscoverable = false
 
