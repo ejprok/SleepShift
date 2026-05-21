@@ -1,6 +1,7 @@
 #if DEBUG
 import SwiftUI
 import SwiftData
+import AlarmKit
 
 struct DevSettingsView: View {
     @Bindable var manager: SleepShiftManager
@@ -33,6 +34,12 @@ struct DevSettingsView: View {
                     if let program = manager.activeProgram {
                         LabeledContent("Current day", value: "\(program.currentDay) of \(program.totalDays)")
                         LabeledContent("Active alarm", value: manager.activeAlarmID?.uuidString.prefix(8).description ?? "none")
+
+                        if let error = manager.lastScheduleError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
 
                         Button("Reschedule Today's Alarm") {
                             Task { await manager.scheduleNextAlarm(forDay: program.currentDay) }

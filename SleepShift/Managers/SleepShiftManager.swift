@@ -9,6 +9,7 @@ final class SleepShiftManager {
 
     var isAuthorized = false
     var activeProgram: ShiftProgram?
+    var lastScheduleError: String?
     private(set) var activeAlarmID: UUID? = {
         guard let s = UserDefaults.standard.string(forKey: "sleepshift.alarmID") else { return nil }
         return UUID(uuidString: s)
@@ -53,8 +54,8 @@ final class SleepShiftManager {
 
     func wakeTime(forDay day: Int, program: ShiftProgram) -> Date {
         if isDevMode {
-            // Compress entire schedule into minutes: each day fires devModeIntervalMinutes apart
-            return program.startDate.addingTimeInterval(Double(day - 1) * Double(devModeIntervalMinutes) * 60)
+            // Always schedule devModeIntervalMinutes from now so the alarm is never in the past
+            return Date.now.addingTimeInterval(Double(devModeIntervalMinutes) * 60)
         }
 
         let shiftMinutes = shiftPerDay * Double(day - 1)
@@ -117,12 +118,18 @@ final class SleepShiftManager {
             let status = try await alarmManager.requestAuthorization()
             isAuthorized = status == .authorized
         } catch {
+            print(error)
             isAuthorized = false
         }
     }
 
     func scheduleNextAlarm(forDay day: Int) async {
         guard let program = activeProgram else { return }
+        await requestAuthorization()
+        guard isAuthorized else {
+            lastScheduleError = "Not authorized to schedule alarms"
+            return
+        }
 
         // Cancel existing — only 1 active SleepShift alarm at a time
         if let id = activeAlarmID {
@@ -135,17 +142,8 @@ final class SleepShiftManager {
         let alarmID = UUID()
 
         let alertPresentation = AlarmPresentation.Alert(
-            title: "Day \(day)/\(program.totalDays) — \(timeString(wakeDate))",
-            stopButton: AlarmButton(
-                text: "I'm up ✓",
-                textColor: .white,
-                systemImageName: "sun.max.fill"
-            ),
-            secondaryButton: AlarmButton(
-                text: "Not today",
-                textColor: .white,
-                systemImageName: "moon.fill"
-            )
+            title: "Wake up",
+            stopButton: AlarmButton(text: "Stop", textColor: .white, systemImageName: "alarm")
         )
 
         let attributes = AlarmAttributes<WakeShiftMetadata>(
@@ -155,24 +153,29 @@ final class SleepShiftManager {
 
         let configuration = AlarmManager.AlarmConfiguration<WakeShiftMetadata>(
             schedule: Alarm.Schedule.fixed(wakeDate),
-            attributes: attributes,
-            secondaryIntent: SkipTodayIntent(scheduledDay: day)
+            attributes: attributes
         )
 
+        print("[SleepShift] Scheduling alarm id=\(alarmID) day=\(day) wakeDate=\(wakeDate) authState=\(alarmManager.authorizationState) isDevMode=\(isDevMode)")
+
+        lastScheduleError = nil
         do {
-            try await alarmManager.schedule(id: alarmID, configuration: configuration)
+            let alarm = try await alarmManager.schedule(id: alarmID, configuration: configuration)
             activeAlarmID = alarmID
             UserDefaults.standard.set(alarmID.uuidString, forKey: alarmIDKey)
             UserDefaults.standard.set(day, forKey: "sleepshift.alarmDay")
             UserDefaults.standard.set(wakeDate, forKey: "sleepshift.alarmTime")
+            print("[SleepShift] Alarm scheduled successfully id=\(alarm.id) schedule=\(alarm.schedule) state=\(alarm.state)")
         } catch {
-            // Scheduling failed — fallback button in HomeView will surface this
+            let ns = error as NSError
+            lastScheduleError = "\(ns.domain) \(ns.code): \(ns.localizedDescription)"
+            print("[SleepShift] Alarm schedule FAILED: \(ns.domain) \(ns.code) \(ns.userInfo)")
         }
     }
 
     func handleForeground() async {
         guard let program = activeProgram, program.isActive, let id = activeAlarmID else { return }
-        let alarms = try? await alarmManager.alarms
+        let alarms = try? alarmManager.alarms
         if !(alarms?.contains(where: { $0.id == id }) ?? false) {
             activeAlarmID = nil
             await scheduleNextAlarm(forDay: program.currentDay)

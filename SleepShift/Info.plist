@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Need to be able schedule alarms</string>
 	<key>CFBundleDisplayName</key>
 	<string>SleepShift</string>
 	<key>CFBundleName</key>
 	<string>SleepShift</string>
-	<key>NSAlarmKitUsageDescription</key>
-	<string>SleepShift schedules your wake alarm each day to gradually shift your sleep schedule.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
