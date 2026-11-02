@@ -2,99 +2,56 @@ import SwiftUI
 
 struct OnboardingView: View {
     var onStart: (Date, Date) -> Void
-
-    @State private var currentWakeTime: Date = defaultTime(hour: 7, minute: 0)
-    @State private var targetWakeTime: Date = defaultTime(hour: 5, minute: 30)
-
+    @State private var currentWakeTime = defaultTime(hour: 7, minute: 0)
+    @State private var targetWakeTime = defaultTime(hour: 5, minute: 30)
+    @State private var starting = false
     private var totalDays: Int {
-        let minutes = abs(
-            Calendar.current.dateComponents([.minute], from: targetWakeTime, to: currentWakeTime).minute ?? 0
-        )
+        let minutes = abs(Calendar.current.dateComponents([.minute], from: targetWakeTime, to: currentWakeTime).minute ?? 0)
         return max(1, Int(ceil(Double(minutes) / 6.5)))
     }
-
-    private var isValid: Bool {
-        targetWakeTime < currentWakeTime
-    }
-
+    private var isValid: Bool { targetWakeTime < currentWakeTime }
     var body: some View {
         ScrollView {
-            VStack(spacing: 40) {
-                header
-                pickers
-                summary
-                startButton
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 48)
-        }
+            VStack(alignment: .leading, spacing: 26) {
+                Text("SLEEPSHIFT").font(.caption.weight(.bold)).tracking(3).foregroundStyle(ShiftStyle.accent)
+                DawnIllustration()
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Earlier mornings.\nSmall beginnings.").font(.system(.largeTitle, design: .serif).weight(.medium))
+                    Text("Move your wake-up time a little earlier, one morning at a time.").foregroundStyle(.secondary)
+                }
+                ShiftCard {
+                    VStack(spacing: 20) {
+                        timeRow("Where you are", subtitle: "Your usual wake-up time", icon: "moon", selection: $currentWakeTime)
+                        Divider()
+                        timeRow("Where you’re headed", subtitle: "Your earlier wake-up time", icon: "sunrise", selection: $targetWakeTime)
+                    }
+                }
+                if isValid {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("About \(totalDays) steps to your new morning", systemImage: "arrow.up.forward").font(.headline)
+                        Text("Around 6½ minutes earlier per step. Your first alarm starts at your usual time.").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                } else {
+                    Label("Choose a target earlier than your usual wake-up time.", systemImage: "info.circle").font(.subheadline).foregroundStyle(ShiftStyle.accent)
+                }
+                Button {
+                    starting = true
+                    onStart(currentWakeTime, targetWakeTime)
+                } label: {
+                    HStack { Text(starting ? "Setting up your morning…" : "Begin my shift"); Spacer(); Image(systemName: "arrow.right") }
+                }.buttonStyle(ShiftPrimaryButton()).disabled(!isValid || starting).opacity(isValid ? 1 : 0.5)
+                Text("Next, allow SleepShift to schedule system alarms on your iPhone.").font(.footnote).foregroundStyle(.secondary)
+            }.padding(24).padding(.bottom, 24)
+        }.background(ShiftStyle.dawn.ignoresSafeArea()).tint(ShiftStyle.accent)
     }
-
-    private var header: some View {
-        VStack(spacing: 8) {
-            Text("SleepShift")
-                .font(.largeTitle.bold())
-            Text("Gradually shift your wake time,\none day at a time.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+    private func timeRow(_ title: String, subtitle: String, icon: String, selection: Binding<Date>) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: icon).font(.headline).foregroundStyle(ShiftStyle.accent)
+            Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+            DatePicker(title, selection: selection, displayedComponents: .hourAndMinute).datePickerStyle(.compact).labelsHidden()
         }
-    }
-
-    private var pickers: some View {
-        VStack(spacing: 28) {
-            pickerRow(label: "Current wake time", selection: $currentWakeTime)
-            Divider()
-            pickerRow(label: "Target wake time", selection: $targetWakeTime)
-        }
-        .padding(20)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private func pickerRow(label: String, selection: Binding<Date>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            DatePicker("", selection: selection, displayedComponents: .hourAndMinute)
-                .datePickerStyle(.wheel)
-                .labelsHidden()
-                .frame(maxWidth: .infinity)
-        }
-    }
-
-    private var summary: some View {
-        Group {
-            if isValid {
-                Text("\(totalDays) days · ~6.5 min/day")
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(.indigo)
-            } else {
-                Text("Target must be earlier than current wake time")
-                    .font(.subheadline)
-                    .foregroundStyle(.red.opacity(0.8))
-            }
-        }
-        .multilineTextAlignment(.center)
-        .animation(.easeInOut(duration: 0.2), value: isValid)
-    }
-
-    private var startButton: some View {
-        Button {
-            onStart(currentWakeTime, targetWakeTime)
-        } label: {
-            Text("Start Program")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .tint(.indigo)
-        .disabled(!isValid)
     }
 }
-
 private func defaultTime(hour: Int, minute: Int) -> Date {
     Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: .now) ?? .now
 }
